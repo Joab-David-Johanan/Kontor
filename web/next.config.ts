@@ -12,15 +12,6 @@ const nextConfig: NextConfig = {
       },
     },
   },
-  async redirects() {
-    return [
-      {
-        source: "/",
-        destination: "/conversations",
-        permanent: false, // false = we may change the home page later
-      },
-    ];
-  }
 };
 
 export default nextConfig;

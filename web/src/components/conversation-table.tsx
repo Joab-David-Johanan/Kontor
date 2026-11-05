@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import type { Channel, Conversation, ConversationStatus } from "@/lib/types";
+import { dateFmt, timeFmt } from "@/lib/format";
 import { StatusBadge } from "./status-badge";
 
 type Filter = ConversationStatus | "all";
@@ -17,22 +18,10 @@ const filters: { value: Filter; label: string }[] = [
 const channelLabels: Record<Channel, string> = {
   voice: "Phone",
   whatsapp: "WhatsApp",
-  email: "Email",
+  outlook: "Outlook",
   web: "Web chat",
 };
 
-// Fixed time zone so server and browser render the same text
-const dateFmt = new Intl.DateTimeFormat("de-DE", {
-  timeZone: "Europe/Berlin",
-  day: "2-digit",
-  month: "2-digit",
-  year: "numeric",
-});
-const timeFmt = new Intl.DateTimeFormat("de-DE", {
-  timeZone: "Europe/Berlin",
-  hour: "2-digit",
-  minute: "2-digit",
-});
 
 export function ConversationTable({ conversations }: { conversations: Conversation[] }) {
   const [filter, setFilter] = useState<Filter>("all");
@@ -120,8 +109,9 @@ export function ConversationTable({ conversations }: { conversations: Conversati
                       {channelLabels[c.channel]}
                     </span>
                   </td>
-                  <td className="truncate px-4 py-4 font-medium text-slate-900" title={c.callerName}>
-                    {c.callerName}
+                  <td className="px-4 py-4" title={c.contact ? `${c.callerName} · ${c.contact}` : c.callerName}>
+                    <div className="truncate font-medium text-slate-900">{c.callerName}</div>
+                    {c.contact && <div className="truncate text-xs text-slate-500">{c.contact}</div>}
                   </td>
                   <td className="px-4 py-4 text-slate-700">
                     {c.emergency && (
