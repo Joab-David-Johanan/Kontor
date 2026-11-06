@@ -1,7 +1,8 @@
+import { Suspense } from "react";
+import { PageSkeleton } from "@/components/page-skeleton";
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
-import { CURRENT_TENANT } from "@/lib/config";
-import { getDashboardMetrics } from "@/lib/api";
+import { getDashboard, getMe } from "@/lib/api";
 import { decimalFmt, numberFmt } from "@/lib/format";
 import { PageHeader } from "@/components/page-header";
 import { StatTile } from "@/components/stat-tile";
@@ -11,23 +12,40 @@ import { HourlyBars } from "@/components/hourly-bars";
 // Tab title becomes "Dashboard · Kontor" (template from layout.tsx)
 export const metadata: Metadata = { title: "Dashboard" };
 
-// app/dashboard/page.tsx → "/dashboard"
-export default async function DashboardPage() {
-  const { tickets, api, tenant } = await getDashboardMetrics(CURRENT_TENANT.id);
+// The page itself renders instantly; its live data streams in inside <Suspense>.
+// The boundary must sit INSIDE the page: on a client navigation (e.g. Dashboard →
+// Support) only the part below the shared layout re-renders, so a loading.tsx at
+// the layout level could not show its skeleton.
+export default function DashboardPage() {
+  return (
+    <Suspense fallback={<PageSkeleton />}>
+      <DashboardContent />
+    </Suspense>
+  );
+}
+
+// app/(tenant)/dashboard/page.tsx → "/dashboard"
+async function DashboardContent() {
+  const [me, { tickets, api, usage }] = await Promise.all([getMe(), getDashboard()]);
+  const emergencies = tickets.flagCounts.emergency ?? 0;
 
   return (
     <main className="mx-auto w-full max-w-6xl px-4 py-10 sm:px-8">
       <PageHeader
-        eyebrow={CURRENT_TENANT.name}
+        eyebrow={me.tenant.name}
         title="Dashboard"
-        description="Demo data. Ticket numbers are calculated from your conversations; API and usage numbers are placeholders until the backend measures them."
+        description={
+          api?.source === "seed"
+            ? "Ticket numbers are calculated live by the API. API and usage numbers are demo values until tracing measures them."
+            : "Ticket numbers are calculated live by the API."
+        }
       />
 
       <Section title="Tickets">
         <div className="grid gap-4 sm:grid-cols-3">
           <StatTile label="Total tickets" value={numberFmt.format(tickets.total)} />
           <StatTile label="Open" value={numberFmt.format(tickets.open)} hint="Everything not resolved" />
-          <StatTile label="Emergencies" value={numberFmt.format(tickets.emergencies)} marker="critical" />
+          <StatTile label="Emergencies" value={numberFmt.format(emergencies)} marker="critical" />
         </div>
         <div className="mt-4 grid gap-4 md:grid-cols-2">
           <Panel title="By status">
@@ -57,6 +75,10 @@ export default async function DashboardPage() {
       </Section>
 
       <Section title="API">
+        {!api ? (
+          <EmptyPanel text="No API measurements yet." />
+        ) : (
+          <>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <StatTile label="Requests (24 h)" value={numberFmt.format(api.requests24h)} />
           <StatTile
@@ -72,15 +94,21 @@ export default async function DashboardPage() {
             <HourlyBars values={api.requestsPerHour} unit="requests" />
           </Panel>
         </div>
+          </>
+        )}
       </Section>
 
       <Section title="Your organisation">
+        {!usage ? (
+          <EmptyPanel text="No usage measurements yet." />
+        ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <StatTile label="Active staff" value={numberFmt.format(tenant.activeStaff)} />
-          <StatTile label="Documents indexed" value={numberFmt.format(tenant.documentsIndexed)} hint="Searchable by the agent" />
-          <StatTile label="Automation rate" value={`${tenant.automationRatePct} %`} hint="Solved without a human" />
-          <StatTile label="Avg. first response" value={`${decimalFmt.format(tenant.avgFirstResponseSec)} s`} />
+          <StatTile label="Active staff" value={numberFmt.format(usage.activeStaff)} />
+          <StatTile label="Documents indexed" value={numberFmt.format(usage.documentsIndexed)} hint="Searchable by the agent" />
+          <StatTile label="Automation rate" value={`${usage.automationRatePct} %`} hint="Solved without a human" />
+          <StatTile label="Avg. first response" value={`${decimalFmt.format(usage.avgFirstResponseSec)} s`} />
         </div>
+        )}
       </Section>
     </main>
   );
@@ -102,5 +130,13 @@ function Panel({ title, children }: { title: string; children: ReactNode }) {
       <h3 className="mb-4 text-sm font-semibold text-slate-900">{title}</h3>
       {children}
     </div>
+  );
+}
+
+function EmptyPanel({ text }: { text: string }) {
+  return (
+    <p className="rounded-lg border border-dashed border-slate-300 px-4 py-8 text-center text-sm text-slate-500">
+      {text}
+    </p>
   );
 }

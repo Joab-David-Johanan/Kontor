@@ -1,0 +1,1153 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Kontor core API",
+    "description": "Multi-tenant core of the Kontor agentic AI platform.",
+    "version": "0.2.0"
+  },
+  "paths": {
+    "/health": {
+      "get": {
+        "tags": [
+          "health"
+        ],
+        "summary": "Health",
+        "description": "Liveness + database check. No authentication.",
+        "operationId": "health_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Health"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/me": {
+      "get": {
+        "tags": [
+          "identity"
+        ],
+        "summary": "Me",
+        "description": "Who is calling: user, role and tenant (None for platform staff).",
+        "operationId": "me_me_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Me"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/me/session-events": {
+      "post": {
+        "tags": [
+          "identity"
+        ],
+        "summary": "Record Session Event",
+        "description": "Record a sign-in or sign-out in the tenant's audit log (shown on the Security page).",
+        "operationId": "record_session_event_me_session_events_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SessionEvent"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/conversations": {
+      "get": {
+        "tags": [
+          "conversations"
+        ],
+        "summary": "List Conversations",
+        "description": "The caller's tenant's conversations, newest first, with cursor (keyset) pagination.",
+        "operationId": "list_conversations_conversations_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConversationPage"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/dashboard": {
+      "get": {
+        "tags": [
+          "dashboard"
+        ],
+        "summary": "Dashboard",
+        "description": "Ticket metrics calculated in SQL for the caller's tenant, plus the latest usage snapshot.",
+        "operationId": "dashboard_dashboard_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Dashboard"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/security": {
+      "get": {
+        "tags": [
+          "security"
+        ],
+        "summary": "Security Overview",
+        "description": "Sign-in rules, staff accounts, API keys and audit log of the caller's tenant.\n\nTenant admins only: operators get 403.",
+        "operationId": "security_overview_security_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SecurityOverview"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/support-issues": {
+      "get": {
+        "tags": [
+          "support"
+        ],
+        "summary": "List Support Issues",
+        "description": "The caller's tenant's issues, newest first.",
+        "operationId": "list_support_issues_support_issues_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/SupportIssue"
+                  },
+                  "type": "array",
+                  "title": "Response List Support Issues Support Issues Get"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "support"
+        ],
+        "summary": "Create Support Issue",
+        "description": "Raise an issue for the platform team. Tenant and reporter come from the caller.",
+        "operationId": "create_support_issue_support_issues_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewSupportIssue"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SupportIssue"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/platform/support-issues": {
+      "get": {
+        "tags": [
+          "support",
+          "platform"
+        ],
+        "summary": "List All Support Issues",
+        "description": "Every tenant's issues for platform staff: most severe first, then longest waiting.",
+        "operationId": "list_all_support_issues_platform_support_issues_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/SupportIssue"
+                  },
+                  "type": "array",
+                  "title": "Response List All Support Issues Platform Support Issues Get"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "ApiKey": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "lastFour": {
+            "type": "string",
+            "title": "Lastfour"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Createdat"
+          },
+          "lastUsedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lastusedat"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "label",
+          "lastFour",
+          "createdAt",
+          "lastUsedAt"
+        ],
+        "title": "ApiKey"
+      },
+      "ApiMetrics": {
+        "properties": {
+          "source": {
+            "type": "string",
+            "enum": [
+              "seed",
+              "tracing"
+            ],
+            "title": "Source"
+          },
+          "requests24h": {
+            "type": "integer",
+            "title": "Requests24H"
+          },
+          "errorRatePct": {
+            "type": "number",
+            "title": "Errorratepct"
+          },
+          "p95LatencyMs": {
+            "type": "integer",
+            "title": "P95Latencyms"
+          },
+          "uptimePct": {
+            "type": "number",
+            "title": "Uptimepct"
+          },
+          "requestsPerHour": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Requestsperhour"
+          }
+        },
+        "type": "object",
+        "required": [
+          "source",
+          "requests24h",
+          "errorRatePct",
+          "p95LatencyMs",
+          "uptimePct",
+          "requestsPerHour"
+        ],
+        "title": "ApiMetrics"
+      },
+      "AuditEvent": {
+        "properties": {
+          "at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "At"
+          },
+          "actor": {
+            "type": "string",
+            "title": "Actor"
+          },
+          "action": {
+            "type": "string",
+            "title": "Action"
+          }
+        },
+        "type": "object",
+        "required": [
+          "at",
+          "actor",
+          "action"
+        ],
+        "title": "AuditEvent"
+      },
+      "ChannelCounts": {
+        "properties": {
+          "voice": {
+            "type": "integer",
+            "title": "Voice"
+          },
+          "whatsapp": {
+            "type": "integer",
+            "title": "Whatsapp"
+          },
+          "outlook": {
+            "type": "integer",
+            "title": "Outlook"
+          },
+          "web": {
+            "type": "integer",
+            "title": "Web"
+          }
+        },
+        "type": "object",
+        "required": [
+          "voice",
+          "whatsapp",
+          "outlook",
+          "web"
+        ],
+        "title": "ChannelCounts"
+      },
+      "Conversation": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "ref": {
+            "type": "string",
+            "title": "Ref"
+          },
+          "channel": {
+            "type": "string",
+            "enum": [
+              "voice",
+              "whatsapp",
+              "outlook",
+              "web"
+            ],
+            "title": "Channel"
+          },
+          "contactName": {
+            "type": "string",
+            "title": "Contactname"
+          },
+          "contact": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Contact"
+          },
+          "summary": {
+            "type": "string",
+            "title": "Summary"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "waiting_approval",
+              "resolved",
+              "escalated"
+            ],
+            "title": "Status"
+          },
+          "flags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Flags"
+          },
+          "attributes": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Attributes"
+          },
+          "startedAt": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Startedat"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "ref",
+          "channel",
+          "contactName",
+          "contact",
+          "summary",
+          "status",
+          "flags",
+          "attributes",
+          "startedAt"
+        ],
+        "title": "Conversation"
+      },
+      "ConversationPage": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/Conversation"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "nextCursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nextcursor"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "title": "ConversationPage"
+      },
+      "Dashboard": {
+        "properties": {
+          "tickets": {
+            "$ref": "#/components/schemas/TicketMetrics"
+          },
+          "api": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ApiMetrics"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "usage": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UsageMetrics"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "tickets",
+          "api",
+          "usage"
+        ],
+        "title": "Dashboard"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "Health": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "ok",
+            "title": "Status"
+          },
+          "database": {
+            "type": "string",
+            "const": "ok",
+            "title": "Database"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "database"
+        ],
+        "title": "Health"
+      },
+      "Me": {
+        "properties": {
+          "userId": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Userid"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "email": {
+            "type": "string",
+            "title": "Email"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "tenant_admin",
+              "tenant_operator",
+              "platform_staff"
+            ],
+            "title": "Role"
+          },
+          "tenant": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TenantRef"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "userId",
+          "name",
+          "email",
+          "role",
+          "tenant"
+        ],
+        "title": "Me"
+      },
+      "NewSupportIssue": {
+        "properties": {
+          "title": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 5,
+            "title": "Title"
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 2000,
+            "minLength": 20,
+            "title": "Description"
+          },
+          "category": {
+            "type": "string",
+            "enum": [
+              "agent_behaviour",
+              "integration",
+              "performance",
+              "access",
+              "billing",
+              "other"
+            ],
+            "title": "Category"
+          },
+          "severity": {
+            "type": "string",
+            "enum": [
+              "critical",
+              "high",
+              "medium",
+              "low"
+            ],
+            "title": "Severity"
+          },
+          "relatedTicketRef": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Relatedticketref"
+          }
+        },
+        "type": "object",
+        "required": [
+          "title",
+          "description",
+          "category",
+          "severity"
+        ],
+        "title": "NewSupportIssue",
+        "description": "What a tenant sends. Tenant, reporter, status, ref and dates are set by the server."
+      },
+      "SecurityOverview": {
+        "properties": {
+          "mfaRequired": {
+            "type": "boolean",
+            "title": "Mfarequired"
+          },
+          "ssoProvider": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ssoprovider"
+          },
+          "sessionTimeoutMin": {
+            "type": "integer",
+            "title": "Sessiontimeoutmin"
+          },
+          "ipAllowlist": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Ipallowlist"
+          },
+          "dataRegion": {
+            "type": "string",
+            "title": "Dataregion"
+          },
+          "retentionDays": {
+            "type": "integer",
+            "title": "Retentiondays"
+          },
+          "piiRedaction": {
+            "type": "boolean",
+            "title": "Piiredaction"
+          },
+          "users": {
+            "items": {
+              "$ref": "#/components/schemas/StaffUser"
+            },
+            "type": "array",
+            "title": "Users"
+          },
+          "apiKeys": {
+            "items": {
+              "$ref": "#/components/schemas/ApiKey"
+            },
+            "type": "array",
+            "title": "Apikeys"
+          },
+          "auditLog": {
+            "items": {
+              "$ref": "#/components/schemas/AuditEvent"
+            },
+            "type": "array",
+            "title": "Auditlog"
+          }
+        },
+        "type": "object",
+        "required": [
+          "mfaRequired",
+          "ssoProvider",
+          "sessionTimeoutMin",
+          "ipAllowlist",
+          "dataRegion",
+          "retentionDays",
+          "piiRedaction",
+          "users",
+          "apiKeys",
+          "auditLog"
+        ],
+        "title": "SecurityOverview"
+      },
+      "SessionEvent": {
+        "properties": {
+          "event": {
+            "type": "string",
+            "enum": [
+              "signed_in",
+              "signed_out"
+            ],
+            "title": "Event"
+          }
+        },
+        "type": "object",
+        "required": [
+          "event"
+        ],
+        "title": "SessionEvent",
+        "description": "Sent by the web app right after sign-in and right before sign-out."
+      },
+      "StaffUser": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "email": {
+            "type": "string",
+            "title": "Email"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "tenant_admin",
+              "tenant_operator",
+              "platform_staff"
+            ],
+            "title": "Role"
+          },
+          "mfaEnabled": {
+            "type": "boolean",
+            "title": "Mfaenabled"
+          },
+          "lastLoginAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lastloginat"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "email",
+          "role",
+          "mfaEnabled",
+          "lastLoginAt"
+        ],
+        "title": "StaffUser"
+      },
+      "StatusCounts": {
+        "properties": {
+          "active": {
+            "type": "integer",
+            "title": "Active"
+          },
+          "waiting_approval": {
+            "type": "integer",
+            "title": "Waiting Approval"
+          },
+          "resolved": {
+            "type": "integer",
+            "title": "Resolved"
+          },
+          "escalated": {
+            "type": "integer",
+            "title": "Escalated"
+          }
+        },
+        "type": "object",
+        "required": [
+          "active",
+          "waiting_approval",
+          "resolved",
+          "escalated"
+        ],
+        "title": "StatusCounts",
+        "description": "One count per status. Field names ARE the status values (no camelCase)."
+      },
+      "SupportIssue": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "ref": {
+            "type": "string",
+            "title": "Ref"
+          },
+          "tenantId": {
+            "type": "string",
+            "title": "Tenantid"
+          },
+          "tenantName": {
+            "type": "string",
+            "title": "Tenantname"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          },
+          "category": {
+            "type": "string",
+            "enum": [
+              "agent_behaviour",
+              "integration",
+              "performance",
+              "access",
+              "billing",
+              "other"
+            ],
+            "title": "Category"
+          },
+          "severity": {
+            "type": "string",
+            "enum": [
+              "critical",
+              "high",
+              "medium",
+              "low"
+            ],
+            "title": "Severity"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "open",
+              "in_progress",
+              "waiting_on_tenant",
+              "resolved"
+            ],
+            "title": "Status"
+          },
+          "reporter": {
+            "type": "string",
+            "title": "Reporter"
+          },
+          "relatedTicketRef": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Relatedticketref"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Createdat"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updatedat"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "ref",
+          "tenantId",
+          "tenantName",
+          "title",
+          "description",
+          "category",
+          "severity",
+          "status",
+          "reporter",
+          "relatedTicketRef",
+          "createdAt",
+          "updatedAt"
+        ],
+        "title": "SupportIssue"
+      },
+      "TenantRef": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name"
+        ],
+        "title": "TenantRef"
+      },
+      "TicketMetrics": {
+        "properties": {
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "open": {
+            "type": "integer",
+            "title": "Open"
+          },
+          "byStatus": {
+            "$ref": "#/components/schemas/StatusCounts"
+          },
+          "byChannel": {
+            "$ref": "#/components/schemas/ChannelCounts"
+          },
+          "flagCounts": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Flagcounts"
+          }
+        },
+        "type": "object",
+        "required": [
+          "total",
+          "open",
+          "byStatus",
+          "byChannel",
+          "flagCounts"
+        ],
+        "title": "TicketMetrics"
+      },
+      "UsageMetrics": {
+        "properties": {
+          "activeStaff": {
+            "type": "integer",
+            "title": "Activestaff"
+          },
+          "documentsIndexed": {
+            "type": "integer",
+            "title": "Documentsindexed"
+          },
+          "automationRatePct": {
+            "type": "number",
+            "title": "Automationratepct"
+          },
+          "avgFirstResponseSec": {
+            "type": "number",
+            "title": "Avgfirstresponsesec"
+          }
+        },
+        "type": "object",
+        "required": [
+          "activeStaff",
+          "documentsIndexed",
+          "automationRatePct",
+          "avgFirstResponseSec"
+        ],
+        "title": "UsageMetrics"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      }
+    },
+    "securitySchemes": {
+      "HTTPBearer": {
+        "type": "http",
+        "description": "OpenID Connect access token (JWT)",
+        "scheme": "bearer"
+      }
+    }
+  }
+}

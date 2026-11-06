@@ -1,6 +1,8 @@
+import { Suspense } from "react";
+import { PageSkeleton } from "@/components/page-skeleton";
 import type { Metadata } from "next";
-import { CURRENT_TENANT } from "@/lib/config";
-import { getSupportIssues } from "@/lib/api";
+import { PLATFORM_NAME, PLATFORM_TEAM } from "@/lib/platform";
+import { getMe, getSupportIssues } from "@/lib/api";
 import { ISSUE_SEVERITIES } from "@/lib/types";
 import { PageHeader } from "@/components/page-header";
 import { SupportForm } from "@/components/support-form";
@@ -10,19 +12,31 @@ import { submitSupportIssue } from "./actions";
 
 export const metadata: Metadata = { title: "Support" };
 
+// The page itself renders instantly; its live data streams in inside <Suspense>.
+// The boundary must sit INSIDE the page: on a client navigation (e.g. Dashboard →
+// Support) only the part below the shared layout re-renders, so a loading.tsx at
+// the layout level could not show its skeleton.
+export default function SupportPage() {
+  return (
+    <Suspense fallback={<PageSkeleton />}>
+      <SupportContent />
+    </Suspense>
+  );
+}
+
 // app/(tenant)/support/page.tsx → "/support"
 // A SERVER component: loads this tenant's issues, then hands the interactive parts
 // (form, history tabs) to client components.
-export default async function SupportPage() {
-  const issues = await getSupportIssues(CURRENT_TENANT.id);
+async function SupportContent() {
+  const [me, issues] = await Promise.all([getMe(), getSupportIssues()]);
   const active = issues.filter((i) => i.status !== "resolved").length;
 
   return (
     <main className="mx-auto w-full max-w-6xl px-4 py-10 sm:px-8">
       <PageHeader
-        eyebrow={CURRENT_TENANT.name}
+        eyebrow={me.tenant.name}
         title="Support"
-        description="Report a problem with the Kontor platform to the CLAR AI platform team. This is for problems with the platform itself, not for your callers' tickets."
+        description={`Report a problem with the ${PLATFORM_NAME} platform to the ${PLATFORM_TEAM}. This is for problems with the platform itself, not for your callers' tickets.`}
       >
         <dl className="text-sm">
           <dt className="text-slate-500">Active issues</dt>

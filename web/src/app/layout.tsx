@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { PLATFORM_NAME } from "@/lib/platform";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -14,8 +15,8 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   // Each page sets its own title; the template adds " · Kontor" to it.
-  title: { default: "Kontor", template: "%s · Kontor" },
-  description: "Operator console for the Kontor agentic AI platform",
+  title: { default: PLATFORM_NAME, template: `%s · ${PLATFORM_NAME}` },
+  description: `Operator console for the ${PLATFORM_NAME} agentic AI platform`,
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

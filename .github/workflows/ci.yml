@@ -1,0 +1,73 @@
+# Runs on every push and pull request: the core API and the web app are checked separately.
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  api:
+    name: API (lint, types, contract + tenant tests)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: api
+    services:
+      postgres:
+        image: pgvector/pgvector:pg17
+        env:
+          POSTGRES_USER: kontor
+          POSTGRES_PASSWORD: kontor
+          POSTGRES_DB: kontor
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd "pg_isready -U kontor -d kontor"
+          --health-interval 3s
+          --health-timeout 3s
+          --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.8.22"
+      - name: Install dependencies
+        run: uv sync --frozen
+      - name: Lint
+        run: uv run ruff check .
+      - name: Formatting
+        run: uv run ruff format --check .
+      - name: Type-check (mypy strict)
+        run: uv run mypy
+      - name: OpenAPI schema is up to date
+        run: |
+          uv run python -m core.export_openapi openapi.json
+          git diff --exit-code openapi.json
+      - name: Tests (migrations, tenant isolation, roles, support, contracts)
+        run: uv run pytest -q
+
+  web:
+    name: Web (types, lint, build)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Install dependencies
+        run: npm ci
+      - name: Generated API types match api/openapi.json
+        run: |
+          npm run gen:api
+          git diff --exit-code src/lib/api-types.ts
+      - name: Type-check
+        run: npx tsc --noEmit
+      - name: Lint
+        run: npm run lint
+      - name: Build
+        run: npm run build

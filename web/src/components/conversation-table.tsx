@@ -22,6 +22,9 @@ const channelLabels: Record<Channel, string> = {
   web: "Web chat",
 };
 
+// STAND-IN → plugin (README §8 row 10): the core only knows generic flags. Until plugins
+// declare their flags (label + style) in plugin.yaml, the hospital's flag is named here.
+const EMERGENCY_FLAG = "emergency";
 
 export function ConversationTable({ conversations }: { conversations: Conversation[] }) {
   const [filter, setFilter] = useState<Filter>("all");
@@ -88,17 +91,18 @@ export function ConversationTable({ conversations }: { conversations: Conversati
           <tbody className="divide-y divide-slate-100">
             {visible.map((c) => {
               const started = new Date(c.startedAt);
+              const emergency = c.flags.includes(EMERGENCY_FLAG);
               return (
                 <tr
                   key={c.id}
                   className={`align-top transition-colors ${
-                    c.emergency
+                    emergency
                       ? "bg-red-50/70 shadow-[inset_4px_0_0_0_var(--color-red-600)] hover:bg-red-50"
                       : "hover:bg-slate-50"
                   }`}
                 >
                   <td className="px-4 py-4 font-mono text-xs font-medium text-slate-500">
-                    #{c.id.toUpperCase()}
+                    #{c.ref}
                   </td>
                   <td className="px-4 py-4 tabular-nums">
                     <div className="font-medium text-slate-900">{timeFmt.format(started)}</div>
@@ -109,12 +113,12 @@ export function ConversationTable({ conversations }: { conversations: Conversati
                       {channelLabels[c.channel]}
                     </span>
                   </td>
-                  <td className="px-4 py-4" title={c.contact ? `${c.callerName} · ${c.contact}` : c.callerName}>
-                    <div className="truncate font-medium text-slate-900">{c.callerName}</div>
+                  <td className="px-4 py-4" title={c.contact ? `${c.contactName} · ${c.contact}` : c.contactName}>
+                    <div className="truncate font-medium text-slate-900">{c.contactName}</div>
                     {c.contact && <div className="truncate text-xs text-slate-500">{c.contact}</div>}
                   </td>
                   <td className="px-4 py-4 text-slate-700">
-                    {c.emergency && (
+                    {emergency && (
                       <span className="mb-1 mr-2 inline-flex rounded bg-red-600 px-1.5 py-0.5 text-[11px] font-bold uppercase tracking-wide text-white">
                         Notfall
                       </span>

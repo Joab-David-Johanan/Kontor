@@ -7,6 +7,7 @@
 import { useActionState, useState, type ReactNode } from "react";
 import { ISSUE_CATEGORIES, ISSUE_SEVERITIES } from "@/lib/types";
 import type { SupportFormState } from "@/app/(tenant)/support/actions";
+import { PLATFORM_TEAM } from "@/lib/platform";
 import { categoryLabels, severityMeta } from "./support-badges";
 
 const MAX_DESCRIPTION = 2000;
@@ -32,8 +33,8 @@ export function SupportForm({
           role="status"
           className="mb-5 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900"
         >
-          <span className="font-semibold">{state.createdId}</span> was sent to the CLAR AI
-          platform team. You&apos;ll find it in your issue history below.
+          <span className="font-semibold">{state.createdRef}</span> was sent to the{" "}
+          {PLATFORM_TEAM}. You&apos;ll find it in your issue history below.
         </div>
       )}
       {state.status === "error" && (
@@ -85,20 +86,20 @@ export function SupportForm({
           </Field>
 
           <Field
-            id="relatedTicketId"
+            id="relatedTicketRef"
             label="Related ticket"
             optional
             hint="The ticket number from your ticket system, if there is one."
-            error={errors.relatedTicketId}
+            error={errors.relatedTicketRef}
           >
             <input
-              id="relatedTicketId"
-              name="relatedTicketId"
+              id="relatedTicketRef"
+              name="relatedTicketRef"
               type="text"
-              defaultValue={values?.relatedTicketId}
+              defaultValue={values?.relatedTicketRef}
               placeholder="C-1002"
-              aria-invalid={!!errors.relatedTicketId}
-              className={`${inputClass(!!errors.relatedTicketId)} font-mono uppercase`}
+              aria-invalid={!!errors.relatedTicketRef}
+              className={`${inputClass(!!errors.relatedTicketRef)} font-mono uppercase`}
             />
           </Field>
         </div>
@@ -109,7 +110,7 @@ export function SupportForm({
 
         <div className="flex flex-wrap items-center justify-between gap-4 border-t border-slate-100 pt-5">
           <p className="max-w-md text-xs text-slate-500">
-            CLAR AI platform staff will read this. Don&apos;t include patient names or health
+            The {PLATFORM_TEAM} will read this. Don&apos;t include patient names or health
             details. Refer to ticket numbers instead.
           </p>
           <button
@@ -123,7 +124,7 @@ export function SupportForm({
                 aria-hidden
               />
             )}
-            {pending ? "Sending…" : "Send to CLAR AI"}
+            {pending ? "Sending…" : "Send to platform team"}
           </button>
         </div>
       </form>

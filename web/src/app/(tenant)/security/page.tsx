@@ -1,7 +1,8 @@
+import { Suspense } from "react";
+import { PageSkeleton } from "@/components/page-skeleton";
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
-import { CURRENT_TENANT } from "@/lib/config";
-import { getSecuritySettings } from "@/lib/api";
+import { getMe, getSecurity } from "@/lib/api";
 import { dateFmt, dateTimeFmt } from "@/lib/format";
 import type { StaffRole } from "@/lib/types";
 import { PageHeader } from "@/components/page-header";
@@ -11,22 +12,37 @@ export const metadata: Metadata = { title: "Security" };
 const roleLabels: Record<StaffRole, string> = {
   tenant_admin: "Admin",
   tenant_operator: "Operator",
+  platform_staff: "Platform staff",
 };
 
-// app/security/page.tsx → "/security"
-export default async function SecurityPage() {
-  const s = await getSecuritySettings(CURRENT_TENANT.id);
+// The page itself renders instantly; its live data streams in inside <Suspense>.
+// The boundary must sit INSIDE the page: on a client navigation (e.g. Dashboard →
+// Support) only the part below the shared layout re-renders, so a loading.tsx at
+// the layout level could not show its skeleton.
+export default function SecurityPage() {
+  return (
+    <Suspense fallback={<PageSkeleton />}>
+      <SecurityContent />
+    </Suspense>
+  );
+}
+
+// app/(tenant)/security/page.tsx → "/security"
+async function SecurityContent() {
+  const me = await getMe();
+  if (me.role !== "tenant_admin") return <AdminsOnly tenantName={me.tenant.name} />;
+  const s = await getSecurity();
 
   return (
     <main className="mx-auto w-full max-w-6xl px-4 py-10 sm:px-8">
       <PageHeader
-        eyebrow={CURRENT_TENANT.name}
+        eyebrow={me.tenant.name}
         title="Security"
         description="How your staff sign in, who has access, and what happened recently."
       />
 
       <p className="mb-8 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-        Demo data. These settings are read-only until real logins arrive in Milestone 3.
+        Read-only for now. Sign-in rules are enforced by the identity provider (Keycloak).
       </p>
 
       <div className="grid gap-6 md:grid-cols-2">
@@ -84,7 +100,7 @@ export default async function SecurityPage() {
                       <OnOff on={u.mfaEnabled} onText="Enabled" offText="Missing" />
                     </td>
                     <td className="py-3 tabular-nums text-slate-700">
-                      {dateTimeFmt.format(new Date(u.lastLoginAt))}
+                      {u.lastLoginAt ? dateTimeFmt.format(new Date(u.lastLoginAt)) : "Never"}
                     </td>
                   </tr>
                 ))}
@@ -169,5 +185,19 @@ function OnOff({ on, onText, offText }: { on: boolean; onText: string; offText: 
       <span className={`h-1.5 w-1.5 rounded-full ${on ? "bg-emerald-500" : "bg-amber-500"}`} aria-hidden />
       {on ? onText : offText}
     </span>
+  );
+}
+
+// Operators reach this page only by typing the URL (the menu hides it for them).
+// The API would refuse them anyway (403); this explains it politely.
+function AdminsOnly({ tenantName }: { tenantName: string }) {
+  return (
+    <main className="mx-auto w-full max-w-6xl px-4 py-10 sm:px-8">
+      <PageHeader eyebrow={tenantName} title="Security" />
+      <p className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-6 text-sm text-slate-600">
+        Only admins can view security settings. Ask an admin of your organisation if you need a
+        change.
+      </p>
+    </main>
   );
 }

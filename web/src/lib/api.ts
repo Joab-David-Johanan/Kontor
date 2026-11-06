@@ -1,112 +1,160 @@
+// The ONLY place the UI gets data from: typed calls to the Kontor core API (FastAPI).
+//
+// - Every function runs on the Next.js SERVER (pages, layouts, server actions, routes).
+// - Each call carries the signed-in user's OpenID Connect access token. The API verifies
+//   it and decides what this person may see: tenant isolation, roles, validation and
+//   ids all live in the core API. This file only fetches.
+// - The request/response types are generated from the API (see types.ts).
+
+import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
+import createClient from "openapi-fetch";
+import type { paths } from "./api-types";
+import { readSession } from "./auth/session";
 import type {
-  Channel,
   Conversation,
-  ConversationStatus,
-  DashboardMetrics,
-  IssueSeverity,
+  Dashboard,
+  Me,
   NewSupportIssue,
-  SecuritySettings,
+  SecurityOverview,
   SupportIssue,
+  TenantRef,
 } from "./types";
-import { mockConversations } from "./mock-data";
-import { mockApiMetrics, mockTenantMetrics } from "./mock-metrics";
-import { mockSecuritySettings } from "./mock-security";
-import { mockSupportIssues } from "./mock-support";
 
-// The ONLY place the UI gets data from. Every function takes a tenantId and
-// returns only that tenant's data. In Milestone 2 these move into FastAPI.
+const BASE_URL = process.env.KONTOR_API_URL ?? "http://localhost:8000";
 
-// Returns ONLY the given tenant's conversations.
-export async function getConversations(tenantId: string): Promise<Conversation[]> {
-  return mockConversations.filter((c) => c.tenantId === tenantId);
-}
-
-export async function getDashboardMetrics(tenantId: string): Promise<DashboardMetrics> {
-  // Ticket metrics are calculated from the tenant's own conversations,
-  // so they can never count another tenant's tickets.
-  const conversations = await getConversations(tenantId);
-
-  const byStatus: Record<ConversationStatus, number> = {
-    active: 0,
-    waiting_approval: 0,
-    escalated: 0,
-    resolved: 0,
-  };
-  const byChannel: Record<Channel, number> = { voice: 0, whatsapp: 0, outlook: 0, web: 0 };
-
-  for (const c of conversations) {
-    byStatus[c.status] += 1;
-    byChannel[c.channel] += 1;
+export class ApiError extends Error {
+  constructor(
+    readonly status: number,
+    message: string,
+  ) {
+    super(message);
+    this.name = "ApiError";
   }
+}
 
-  const api = mockApiMetrics[tenantId];
-  const tenant = mockTenantMetrics[tenantId];
-  if (!api || !tenant) {
-    throw new Error(`No metrics for tenant "${tenantId}"`);
+function clientFor(token: string) {
+  return createClient<paths>({ baseUrl: BASE_URL, headers: { Authorization: `Bearer ${token}` } });
+}
+
+/** A client acting as the signed-in user. No session → back to the sign-in page. */
+async function api() {
+  const jar = await cookies();
+  const session = await readSession((name) => jar.get(name)?.value);
+  if (!session) redirect("/login");
+  return clientFor(session.accessToken);
+}
+
+type ApiResult<T> = { data?: T; error?: unknown; response: Response };
+
+// Turn a network failure or a non-2xx response into an ApiError with a readable message.
+async function call<T>(request: Promise<ApiResult<T>>): Promise<T> {
+  let result: ApiResult<T>;
+  try {
+    result = await request;
+  } catch {
+    throw new ApiError(503, `The Kontor API isn't reachable at ${BASE_URL}. Is it running?`);
   }
-
-  return {
-    tickets: {
-      total: conversations.length,
-      open: conversations.length - byStatus.resolved,
-      emergencies: conversations.filter((c) => c.emergency).length,
-      byStatus,
-      byChannel,
-    },
-    api,
-    tenant,
-  };
-}
-
-export async function getSecuritySettings(tenantId: string): Promise<SecuritySettings> {
-  const settings = mockSecuritySettings.find((s) => s.tenantId === tenantId);
-  if (!settings) {
-    throw new Error(`No security settings for tenant "${tenantId}"`);
+  // The token was rejected (expired session, account removed): sign in again.
+  if (result.response.status === 401) redirect("/login?error=session_expired");
+  if (result.data === undefined) {
+    throw new ApiError(result.response.status, describe(result.error, result.response.status));
   }
-  return settings;
+  return result.data;
 }
 
-// ── Support ─────────────────────────────────────────────────
-
-const newestFirst = (a: SupportIssue, b: SupportIssue) => b.createdAt.localeCompare(a.createdAt);
-
-// Tenant portal: ONLY this tenant's issues, newest first.
-export async function getSupportIssues(tenantId: string): Promise<SupportIssue[]> {
-  return mockSupportIssues.filter((i) => i.tenantId === tenantId).sort(newestFirst);
+function describe(error: unknown, status: number): string {
+  if (error && typeof error === "object" && "detail" in error && typeof error.detail === "string") {
+    return error.detail;
+  }
+  return `The Kontor API answered with status ${status}.`;
 }
 
-const severityRank: Record<IssueSeverity, number> = { critical: 0, high: 1, medium: 2, low: 3 };
+// ── Sign-in bookkeeping (called by the /auth routes with a fresh token) ──
 
-// Platform portal: EVERY tenant's issues, most severe first, then oldest first
-// (the issue waiting longest gets handled first).
-// ⚠️ From Milestone 3 this must check that the caller is platform staff.
-export async function getAllSupportIssues(): Promise<SupportIssue[]> {
-  return [...mockSupportIssues].sort(
-    (a, b) =>
-      severityRank[a.severity] - severityRank[b.severity] ||
-      a.createdAt.localeCompare(b.createdAt),
+/** Tell the API about a sign-in or sign-out. Returns the HTTP status (0 = unreachable). */
+export async function recordSessionEvent(
+  accessToken: string,
+  event: "signed_in" | "signed_out",
+): Promise<number> {
+  try {
+    const { response } = await clientFor(accessToken).POST("/me/session-events", {
+      body: { event },
+    });
+    return response.status;
+  } catch {
+    return 0;
+  }
+}
+
+// ── Anyone signed in ────────────────────────────────────────
+
+/** The signed-in user (tenant staff or platform staff). */
+export async function getCurrentUser(): Promise<Me> {
+  return call((await api()).GET("/me"));
+}
+
+// ── Tenant portal ───────────────────────────────────────────
+
+/** The signed-in tenant user, with their tenant. */
+export async function getMe(): Promise<Me & { tenant: TenantRef }> {
+  const me = await getCurrentUser();
+  if (!me.tenant) throw new ApiError(403, "This page is for tenant staff.");
+  return { ...me, tenant: me.tenant };
+}
+
+/** The first 100 conversations, newest first (the API pages with a cursor). */
+export async function getConversations(): Promise<Conversation[]> {
+  const page = await call(
+    (await api()).GET("/conversations", { params: { query: { limit: 100 } } }),
   );
+  return page.items;
 }
 
-export async function createSupportIssue(
-  tenant: { id: string; name: string },
-  reporter: string,
-  input: NewSupportIssue,
-): Promise<SupportIssue> {
-  // Next id: highest existing number + 1, e.g. SUP-1045 → SUP-1046
-  const nextNumber = Math.max(1000, ...mockSupportIssues.map((i) => Number(i.id.slice(4)))) + 1;
-  const now = new Date().toISOString();
+export async function getDashboard(): Promise<Dashboard> {
+  return call((await api()).GET("/dashboard"));
+}
 
-  const issue: SupportIssue = {
-    ...input,
-    id: `SUP-${nextNumber}`,
-    tenantId: tenant.id,
-    tenantName: tenant.name,
-    reporter,
-    status: "open",
-    createdAt: now,
-    updatedAt: now,
-  };
-  mockSupportIssues.push(issue);
-  return issue;
+/** Tenant admins only; the API answers 403 for operators. */
+export async function getSecurity(): Promise<SecurityOverview> {
+  return call((await api()).GET("/security"));
+}
+
+export async function getSupportIssues(): Promise<SupportIssue[]> {
+  return call((await api()).GET("/support-issues"));
+}
+
+export type CreateIssueResult =
+  | { ok: true; issue: SupportIssue }
+  | { ok: false; message: string; fieldErrors: Record<string, string> };
+
+/** Create a support issue. Validation errors (422) come back per field. */
+export async function createSupportIssue(input: NewSupportIssue): Promise<CreateIssueResult> {
+  const client = await api();
+  let result;
+  try {
+    result = await client.POST("/support-issues", { body: input });
+  } catch {
+    return { ok: false, message: `The Kontor API isn't reachable at ${BASE_URL}.`, fieldErrors: {} };
+  }
+  const { data, error, response } = result;
+  if (data) return { ok: true, issue: data };
+  if (response.status === 401) redirect("/login?error=session_expired");
+
+  const fieldErrors: Record<string, string> = {};
+  if (response.status === 422 && error && Array.isArray(error.detail)) {
+    for (const problem of error.detail) {
+      const field = String(problem.loc[problem.loc.length - 1]); // e.g. "relatedTicketRef"
+      fieldErrors[field] ??= problem.msg;
+    }
+    return { ok: false, message: "Please fix the highlighted fields.", fieldErrors };
+  }
+  return { ok: false, message: describe(error, response.status), fieldErrors };
+}
+
+// ── Platform portal ─────────────────────────────────────────
+
+/** Every tenant's issues, already in triage order (platform staff only). */
+export async function getAllSupportIssues(): Promise<SupportIssue[]> {
+  return call((await api()).GET("/platform/support-issues"));
 }

@@ -1,7 +1,10 @@
+import { Suspense } from "react";
+import { PageSkeleton } from "@/components/page-skeleton";
 import type { Metadata } from "next";
 import { getAllSupportIssues } from "@/lib/api";
 import { ISSUE_SEVERITIES, type SupportIssue } from "@/lib/types";
 import { dateTimeFmt } from "@/lib/format";
+import { PLATFORM_TEAM } from "@/lib/platform";
 import { PageHeader } from "@/components/page-header";
 import { StatTile } from "@/components/stat-tile";
 import {
@@ -13,9 +16,21 @@ import {
 
 export const metadata: Metadata = { title: "Support queue" };
 
+// The page itself renders instantly; its live data streams in inside <Suspense>.
+// The boundary must sit INSIDE the page: on a client navigation (e.g. Dashboard →
+// Support) only the part below the shared layout re-renders, so a loading.tsx at
+// the layout level could not show its skeleton.
+export default function PlatformSupportPage() {
+  return (
+    <Suspense fallback={<PageSkeleton />}>
+      <PlatformSupportContent />
+    </Suspense>
+  );
+}
+
 // app/platform/support/page.tsx → "/platform/support"
-// The CLAR AI platform team's queue: issues from EVERY tenant, most severe first.
-export default async function PlatformSupportPage() {
+// The platform team's queue: issues from EVERY tenant, most severe first.
+async function PlatformSupportContent() {
   const issues = await getAllSupportIssues();
   const queue = issues.filter((i) => i.status !== "resolved");
   const resolved = issues.filter((i) => i.status === "resolved");
@@ -24,7 +39,7 @@ export default async function PlatformSupportPage() {
   return (
     <main className="mx-auto w-full max-w-6xl px-4 py-10 sm:px-8">
       <PageHeader
-        eyebrow="CLAR AI platform team"
+        eyebrow={PLATFORM_TEAM}
         title="Support queue"
         description={`${queue.length} open ${queue.length === 1 ? "issue" : "issues"} from ${tenantCount} ${tenantCount === 1 ? "tenant" : "tenants"}, most severe first, then longest waiting.`}
       />
@@ -93,7 +108,7 @@ function IssueTable({
                   : ""
               }`}
             >
-              <td className="px-4 py-4 font-mono text-xs font-medium text-slate-500">{i.id}</td>
+              <td className="px-4 py-4 font-mono text-xs font-medium text-slate-500">{i.ref}</td>
               <td className="px-4 py-4">
                 <div className="font-medium text-slate-900">{i.tenantName}</div>
                 <div className="text-xs text-slate-500">{i.reporter}</div>
@@ -105,7 +120,7 @@ function IssueTable({
                 <div className="font-medium text-slate-900">{i.title}</div>
                 <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-500">
                   <CategoryLabel category={i.category} />
-                  {i.relatedTicketId && <span className="font-mono">{i.relatedTicketId}</span>}
+                  {i.relatedTicketRef && <span className="font-mono">{i.relatedTicketRef}</span>}
                 </div>
               </td>
               <td className="px-4 py-4">

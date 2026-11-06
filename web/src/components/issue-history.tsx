@@ -64,7 +64,7 @@ export function IssueHistory({ issues }: { issues: SupportIssue[] }) {
               className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm transition hover:border-slate-300"
             >
               <div className="flex flex-wrap items-center gap-2">
-                <span className="font-mono text-xs font-medium text-slate-500">{i.id}</span>
+                <span className="font-mono text-xs font-medium text-slate-500">{i.ref}</span>
                 <SeverityBadge severity={i.severity} />
                 <IssueStatusBadge status={i.status} />
                 <CategoryLabel category={i.category} />
@@ -73,7 +73,7 @@ export function IssueHistory({ issues }: { issues: SupportIssue[] }) {
               <p className="mt-1 line-clamp-2 text-sm text-slate-600">{i.description}</p>
               <p className="mt-2 text-xs text-slate-500">
                 {i.reporter} · opened {dateTimeFmt.format(new Date(i.createdAt))}
-                {i.relatedTicketId && <> · ticket {i.relatedTicketId}</>}
+                {i.relatedTicketRef && <> · ticket {i.relatedTicketRef}</>}
               </p>
             </li>
           ))}
